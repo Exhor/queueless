@@ -11,10 +11,15 @@ class TaskStatus(Enum):
 
 
 @dataclass
-class Task:
+class TaskSummary:
     id_: int
-    status: TaskStatus
     owner: int
+    status: TaskStatus
+
+
+@dataclass
+class TaskDetails:
+    id_: int
     func: str
     kwargs: str
     results: str

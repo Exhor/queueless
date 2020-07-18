@@ -1,15 +1,12 @@
-from qless.sql import session_scope
-import dill
-from contextlib import contextmanager
-from dataclasses import dataclass
 from time import sleep
-from typing import Generator, Optional
+from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy.engine import create_engine
-from sqlalchemy.orm.session import Session, sessionmaker
+import dill
 
-from qless.task import Task, TaskDetails, TaskStatus
+from qless.sql import session_scope
+from qless.task import Task, TaskStatus
+from qless.task_record import TaskDetailsRecord, TaskSummaryRecord
 
 
 def work_loop() -> None:
@@ -23,8 +20,8 @@ def work_loop() -> None:
 
 
 def run(task: Task) -> None:
-    func = dill.loads(task.func)
-    params = dill.loads(task.kwargs)
+    func = dill.loads(eval(task.func))
+    params = dill.loads(eval(task.kwargs))
     try:
         results = str(dill.dumps(func(params)))
         status = TaskStatus.DONE
@@ -34,29 +31,29 @@ def run(task: Task) -> None:
     save(task, results, status)
 
 
-def save(task: Task, results: str, status: TaskStatus) -> None:
+def save(task_id: int, results: str, status: TaskStatus) -> None:
     with session_scope() as session:
-        rec = session.query(TaskDetails).get(Task.id_).one()
+        rec = session.query(TaskDetailsRecord).get(task_id).one()
         rec.results = results
         session.merge(rec)
     with session_scope() as session:
-        rec = session.query(TaskStatus).get(Task.id_).one()
+        rec = session.query(TaskStatus).get(task_id).one()
         rec.status = status.value
         session.merge(rec)
 
 
 def claim_task(owner: int) -> Optional[Task]:
     with session_scope() as session:
-        rec = session.query(TaskStatus).filter_by(status=TaskStatus.PENDING).first()
+        rec = session.query(TaskSummaryRecord).filter_by(status=TaskStatus.PENDING).first()
         if rec is None or rec.owner != 0:
             return None
         rec.owner = owner
         session.merge(rec)
         rec_id = rec.id
 
-    # Separate session. Minimise lock time on TaskStatus table
+    # Separate session. Minimise lock time on Task Status table
     with session_scope() as session:
-        details = session.query(TaskDetails).get(rec_id).one()
+        details = session.query(TaskDetailsRecord).get(rec_id).one()
         func = details.function_dill
         kwargs = details.kwargs_dill
     return Task(

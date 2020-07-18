@@ -7,19 +7,12 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.6"
-sqlalchemy = "\b"
-dill = "^0.3.2"
+dill = "*"
+sqlalchemy = "*"
+psycopg2 = "^2.8.5"
 
 [tool.poetry.dev-dependencies]
-black = { version = "*", allow-prereleases = true }
-mypy = "\b"
-flake8 = "^3.8.3"
-
-[[tool.poetry.source]]
-name = "simple-pypi"
-url = "https://pypi.org/simple/"
 
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
-

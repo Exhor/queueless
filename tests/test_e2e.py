@@ -13,11 +13,12 @@ def make_func() -> Callable[[str], int]:
 
     return closured   
 
-def submit(func: Callable[..., Any]) -> int:
-    task = Task
+
 
 if __name__ == "__main__":
-    start_workers(2)
-    func = make_func()
-    submit(func, {"param": "abc"})
-    sleep(3)
+    print(2)
+    # start_workers(2)
+    # func = make_func()
+    # task_id = submit(func, {"param": "abc"})
+    # sleep(3)
+    # task = collect(task_id)

@@ -1,6 +1,5 @@
 {
-    "python.pythonPath": "C:\\Users\\tadeo\\envs\\qless\\Scripts\\python.exe",
     "python.formatting.provider": "black",
     "files.autoSave": "onFocusChange",
-    "python.analysis.typeCheckingMode": "basic"
+    "python.analysis.typeCheckingMode": "basic",
 }

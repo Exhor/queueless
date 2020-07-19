@@ -9,12 +9,13 @@ def make_func() -> Callable[[str], int]:
     class ClosuredClass:
         def __init__(self, x: int) -> None:
             self.x = x
-    closured_obj = ClosuredClass(x=42)
-    
-    def closured(param: str) -> int:
-        return len(param) + closured_obj.x 
 
-    return closured   
+    closured_obj = ClosuredClass(x=42)
+
+    def closured(param: str) -> int:
+        return len(param) + closured_obj.x
+
+    return closured
 
 
 def start_workers(n_workers: int) -> Process:
@@ -22,8 +23,10 @@ def start_workers(n_workers: int) -> Process:
     p.start()
     return p
 
+
 def test_db_url() -> str:
     return "postgres://postgres:test@localhost:5000/qless"
+
 
 def start_db() -> str:
     db_url = test_db_url()
@@ -31,6 +34,7 @@ def start_db() -> str:
     #     "docker run --rm --name pg-test -e POSTGRES_PASSWORD=test -d -p 5000:5432 postgres:11"
     # )
     return db_url
+
 
 if __name__ == "__main__":
     db_url = start_db()

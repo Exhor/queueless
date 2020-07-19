@@ -11,8 +11,14 @@ def submit(func: Callable[..., Any], kwargs: Dict[str, Any], creator: int) -> in
     kwargs_str = str(dill.dumps(kwargs))
     status = TaskStatus.PENDING.value
 
-    rec = TaskRecord(creator=creator, owner=0, status=status, function_dill=func_str,
-                     kwargs_dill=kwargs_str, results_dill="")
+    rec = TaskRecord(
+        creator=creator,
+        owner=0,
+        status=status,
+        function_dill=func_str,
+        kwargs_dill=kwargs_str,
+        results_dill="",
+    )
     with session_scope() as session:
         session.add(rec)
         session.flush()

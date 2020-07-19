@@ -2,8 +2,10 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+
 class Base(BaseModel):
     pass
+
 
 class TaskStatus(Enum):
     PENDING = 1

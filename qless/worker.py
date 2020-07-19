@@ -11,7 +11,7 @@ from qless.task import TaskStatus, Task
 from qless.task_record import TaskRecord
 
 
-def work_loop(cleanup_every_seconds:int=1000, tick_seconds:float=0.01) -> None:
+def work_loop(cleanup_every_seconds: int = 1000, tick_seconds: float = 0.01) -> None:
     me = hash(str(uuid4())) % 1_000_000_000
     while True:
         sleep(tick_seconds)
@@ -21,11 +21,14 @@ def work_loop(cleanup_every_seconds:int=1000, tick_seconds:float=0.01) -> None:
         if random() < 1 / (cleanup_every_seconds / tick_seconds):
             cleanup()
 
+
 def cleanup():
     retry_task_whose_owner_is_dead()
 
+
 def retry_task_whose_owner_is_dead():
     pass
+
 
 def run(task: Task) -> None:
     func = dill.loads(eval(task.func))
@@ -59,9 +62,13 @@ def save(task_id: int, results: str, status: TaskStatus, owner: int) -> None:
 def claim_task(owner: int) -> Optional[Task]:
     no_owner = 0
     search_status = TaskStatus.PENDING.value
-    new_status =  TaskStatus.RUNNING.value
+    new_status = TaskStatus.RUNNING.value
     with sql.session_scope() as session:
-        rec = session.query(TaskRecord).filter_by(status=search_status, owner=no_owner).first()
+        rec = (
+            session.query(TaskRecord)
+            .filter_by(status=search_status, owner=no_owner)
+            .first()
+        )
         if rec is None:
             return None
         rec.owner = owner
@@ -72,7 +79,16 @@ def claim_task(owner: int) -> Optional[Task]:
         id_ = rec.id_
         creator = rec.creator
 
-    return Task(id_=id_, owner=owner, creator=creator, status=new_status, func=func, kwargs=kwargs, results="")
+    return Task(
+        id_=id_,
+        owner=owner,
+        creator=creator,
+        status=new_status,
+        func=func,
+        kwargs=kwargs,
+        results="",
+    )
+
 
 if __name__ == "__main__":
     sql.start_global_engine("postgres://postgres:test@localhost:5000/qless")

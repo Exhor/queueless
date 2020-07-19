@@ -1,7 +1,9 @@
-
-from dataclasses import dataclass
 from enum import Enum
 
+from pydantic import BaseModel
+
+class Base(BaseModel):
+    pass
 
 class TaskStatus(Enum):
     PENDING = 1
@@ -10,16 +12,11 @@ class TaskStatus(Enum):
     DONE = 4
 
 
-@dataclass
-class TaskSummary:
+class Task(Base):
     id_: int
     owner: int
+    creator: int
     status: TaskStatus
-
-
-@dataclass
-class TaskDetails:
-    id_: int
     func: str
     kwargs: str
     results: str

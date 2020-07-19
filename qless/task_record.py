@@ -5,22 +5,15 @@ from sqlalchemy.types import Integer, Text
 BASE = declarative_base()
 
 
-class TaskSummaryRecord(BASE):  # type: ignore
-    """ Holds task status, owner. Small records, fast access """
+class TaskRecord(BASE):  # type: ignore
 
-    __tablename__ = "task_summary"
+    __tablename__ = "task"
 
     id_ = Column(Integer, primary_key=True)
+    creator = Column(Integer, nullable=False)
     owner = Column(Integer, nullable=False)
-    status = Column(Integer, nullable=False)  # 1-4: pending, running, done, error
+    status = Column(Integer, nullable=False)  # see TaskStatus
 
-
-class TaskDetailsRecord(BASE):  # type: ignore
-    """ Task specification and results, only accessed seldom """
-
-    __tablename__ = "task_details"
-
-    id_ = Column(Integer, primary_key=True)
     function_dill = Column(Text, nullable=False)
     kwargs_dill = Column(Text, nullable=False)
     results_dill = Column(Text, nullable=False)

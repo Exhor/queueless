@@ -1,7 +1,13 @@
 # queueless
 Python task distribution using a DB instead of queues
 
-# contribute
+# Install 
+Coming soon...
+
+# Usage
+Coming soon...
+
+# Development setup
 ## get poetry
 curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
 

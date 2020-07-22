@@ -91,5 +91,5 @@ def claim_task(owner: int) -> Optional[Task]:
 
 
 if __name__ == "__main__":
-    sql.start_global_engine("postgres://postgres:test@localhost:5000/qless")
+    sql.startup("postgres://postgres:test@localhost:5000/qless")
     work_loop()

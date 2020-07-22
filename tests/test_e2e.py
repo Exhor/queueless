@@ -1,3 +1,4 @@
+import os
 from multiprocessing import Process
 from time import sleep
 from typing import Callable
@@ -34,7 +35,7 @@ def test_db_url() -> str:
     return "postgres://postgres:test@localhost:5000/qless"
 
 
-def start_db() -> str:
+def _start_local_postgres_docker_db() -> str:
     db_url = test_db_url()
     os.system("docker kill pg-test")
     os.system(
@@ -43,12 +44,13 @@ def start_db() -> str:
     while not "database system is ready" in os.popen("docker logs pg-test").read():
         log.log("Waiting for DB to be ready...")
         sleep(0.2)
+    sleep(0.5)
     return db_url
 
 
 if __name__ == "__main__":
-    db_url = start_db()
-    sql.start_global_engine(db_url)
+    db_url = _start_local_postgres_docker_db()
+    sql.startup(db_url)
     # sql.reset()
     w = start_workers(1)
     func = make_func()

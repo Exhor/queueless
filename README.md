@@ -8,6 +8,9 @@ Coming soon...
 Coming soon...
 
 # Development setup
+## test
+python tests/test_e2e.py
+
 ## get poetry
 curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
 

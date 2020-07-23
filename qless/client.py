@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict
 import dill
 from qless.sql import session_scope
 from qless.task import TaskStatus
-from qless.task_record import TaskRecord
+from qless.records import TaskRecord
 
 
 def submit(func: Callable[..., Any], kwargs: Dict[str, Any], creator: int) -> int:
@@ -30,8 +30,7 @@ def submit(func: Callable[..., Any], kwargs: Dict[str, Any], creator: int) -> in
 
 def get_task_status(task_id: int) -> TaskStatus:
     with session_scope() as session:
-        rec = session.query(TaskRecord.status).get(task_id)
-    return rec
+        return session.query(TaskRecord.status).get(task_id)
 
 
 def get_task_result(task_id: int) -> Any:
@@ -39,3 +38,8 @@ def get_task_result(task_id: int) -> Any:
         rec = session.query(TaskRecord).get(task_id)
         results = rec.results_dill
     return dill.loads(eval(results)) if results else None
+
+
+def get_task_retries(task_id: int) -> int:
+    with session_scope() as session:
+        return session.query(TaskRecord.retries).get(task_id)

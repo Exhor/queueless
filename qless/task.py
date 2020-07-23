@@ -22,3 +22,4 @@ class Task(Base):
     func: str
     kwargs: str
     results: str
+    retries: int = 0

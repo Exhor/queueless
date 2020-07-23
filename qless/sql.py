@@ -5,7 +5,7 @@ from sqlalchemy.engine import create_engine
 from sqlalchemy.orm.session import Session, sessionmaker
 
 from qless.log import log
-from qless.task_record import BASE
+from qless.records import BASE
 
 _engine = None
 _session_maker = None

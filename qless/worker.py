@@ -1,3 +1,5 @@
+import sys
+from datetime import datetime
 from random import random
 from time import sleep
 from typing import Optional
@@ -8,13 +10,23 @@ import dill
 from qless import sql
 from qless.log import log
 from qless.task import TaskStatus, Task
-from qless.task_record import TaskRecord
+from qless.records import TaskRecord
 
 
-def work_loop(cleanup_every_seconds: int = 1000, tick_seconds: float = 0.01) -> None:
-    me = hash(str(uuid4())) % 1_000_000_000
+def work_loop(
+    db_url: str, cleanup_every_seconds: int = 1000, tick_seconds: float = 1
+) -> None:
+    """ Infinite loop that continuously monitors the DB for tasks,
+    claims tasks, executes their code, and saves results
+
+    It will also periodically do a clean up (reset orphaned tasks, delete old results)
+    """
+    sql.startup(db_url)
+    me = hash(str(uuid4())) % 1000000000
+    log(f"Worker started. Id = {me}")
     while True:
         sleep(tick_seconds)
+        print(datetime.now())
         task = claim_task(me)
         if task is not None:
             run(task)
@@ -91,5 +103,10 @@ def claim_task(owner: int) -> Optional[Task]:
 
 
 if __name__ == "__main__":
-    sql.startup("postgres://postgres:test@localhost:5000/qless")
-    work_loop()
+    db_url = "postgres://postgres:test@localhost:5000/qless"
+    if len(sys.argv) < 2:
+        log(f"SQL connection string not specified. Using default: {db_url}")
+    else:
+        db_url = sys.argv[1]
+
+    work_loop(db_url)

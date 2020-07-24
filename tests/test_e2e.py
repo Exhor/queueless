@@ -5,6 +5,7 @@ from time import sleep
 from typing import Callable, List
 
 from qless import client, sql, log
+
 # A Script to test the library functionality end to end
 from qless.records import TaskRecord
 from qless.task import TaskStatus

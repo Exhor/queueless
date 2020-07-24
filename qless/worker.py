@@ -11,11 +11,7 @@ from qless.records import TaskRecord, WorkerRecord
 from qless.task import TaskStatus, Task
 
 
-def work_loop(
-    db_url: str,
-    tick_seconds: float = 1,
-    worker_tag: str = "",
-) -> None:
+def work_loop(db_url: str, tick_seconds: float = 1, worker_tag: str = "") -> None:
     """ Infinite loop that continuously monitors the DB for tasks,
     claims tasks, executes their code, and saves results
 
@@ -27,9 +23,9 @@ def work_loop(
     while _hearbeat(me):
         sleep(tick_seconds)
         print(f"{datetime.now()} [{worker_tag}]")
-        task = claim_task(me, worker_tag)
+        task = _claim_task(me, worker_tag)
         if task is not None:
-            run(task)
+            _run_task(task)
 
 
 def _register_worker(worker_tag: str) -> int:
@@ -47,7 +43,7 @@ def _hearbeat(worker_id: int) -> bool:
 
     :returns: True if all is normal, False if execution should stop
     """
-    cleanup()
+    _cleanup()
     with sql.session_scope() as session:
         record = session.query(WorkerRecord).get(worker_id)
         if record is None:
@@ -57,27 +53,30 @@ def _hearbeat(worker_id: int) -> bool:
     return True
 
 
-def cleanup():
-    retry_task_whose_owner_is_dead()
+def _cleanup():
+    _retry_task_whose_owner_is_dead()
 
 
 def _max_seconds_without_hearbeat():
     return 5
 
 
-def retry_task_whose_owner_is_dead():
+def _retry_task_whose_owner_is_dead():
     too_long_ago = datetime.now() - timedelta(seconds=_max_seconds_without_hearbeat())
     with sql.session_scope() as session:
-        dead_workers = session.query(WorkerRecord).filter(WorkerRecord.last_heartbeat < too_long_ago).all()
+        dead_workers = (
+            session.query(WorkerRecord)
+            .filter(WorkerRecord.last_heartbeat < too_long_ago)
+            .all()
+        )
         tasks_ids_to_reset = [w.working_on_task_id for w in dead_workers]
         if tasks_ids_to_reset:
-            session.query(TaskRecord).filter(TaskRecord.id_.in_(tasks_ids_to_reset)).update({"status": TaskStatus.PENDING.value})
+            session.query(TaskRecord).filter(
+                TaskRecord.id_.in_(tasks_ids_to_reset)
+            ).update({"status": TaskStatus.PENDING.value})
 
 
-
-
-
-def run(task: Task) -> None:
+def _run_task(task: Task) -> None:
     func = dill.loads(eval(task.func))
     params = dill.loads(eval(task.kwargs))
 
@@ -90,23 +89,27 @@ def run(task: Task) -> None:
     except Exception as err:
         status = TaskStatus.ERROR
         results = str(err)
-    save(task.id_, results, status, task.owner)
+    _save_results(task.id_, results, status, task.owner)
 
 
-def save(task_id: int, results: str, status: TaskStatus, owner: int) -> None:
+def _save_results(task_id: int, results: str, status: TaskStatus, owner: int) -> None:
     with sql.session_scope() as session:
-        rec = session.query(TaskRecord).get(task_id)
+        task = session.query(TaskRecord).get(task_id)
 
         # Task no longer owned? Or stopped by another process? Do not save
-        if rec.owner != owner or rec.status != TaskStatus.RUNNING.value:
+        if task.owner != owner or task.status != TaskStatus.RUNNING.value:
             return None
 
-        rec.results_dill = results
-        rec.status = status.value
-        session.merge(rec)
+        task.results_dill = results
+        task.status = status.value
+        session.merge(task)
+
+        worker = session.query(WorkerRecord).get(owner)
+        worker.working_on_task_id = None
+        session.merge(worker)
 
 
-def claim_task(owner: int, worker_tag: str) -> Optional[Task]:
+def _claim_task(owner: int, worker_tag: str) -> Optional[Task]:
     no_owner = 0
     with sql.session_scope() as session:
         rec = (
@@ -124,6 +127,10 @@ def claim_task(owner: int, worker_tag: str) -> Optional[Task]:
         kwargs = rec.kwargs_dill
         id_ = rec.id_
         creator = rec.creator
+
+        worker = session.query(WorkerRecord).get(owner)
+        worker.working_on_task_id = id_
+        session.merge(worker)
 
     return Task(
         id_=id_,

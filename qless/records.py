@@ -1,6 +1,6 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.schema import Column
-from sqlalchemy.types import Integer, Text, DateTime, Boolean
+from sqlalchemy.types import Integer, Text, DateTime
 
 BASE = declarative_base()
 

@@ -5,8 +5,8 @@ from time import sleep
 from typing import Callable, List
 
 from qless import client, sql, log
-
 # A Script to test the library functionality end to end
+from qless.records import TaskRecord
 from qless.task import TaskStatus
 from qless.worker import work_loop
 
@@ -16,7 +16,7 @@ def run_test_e2e():
     sql.startup(db_url)
     # sql.reset()
     worker_tag = "e2e_test_worker"
-    _start_workers(n_workers=1, db_url=db_url, worker_tag=worker_tag)
+    worker = _start_workers(n_workers=1, db_url=db_url, worker_tag=worker_tag)[0]
     _start_workers(n_workers=1, db_url=db_url, worker_tag="cleaner")
     func = _make_test_function()
 
@@ -30,9 +30,16 @@ def run_test_e2e():
     # Tasks are resheduled if a worker dies
     task_id = client.submit(_sleep, {"seconds": 5}, 123, requires_tag=worker_tag)
     _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.RUNNING)
-    client.kill_workers_with_tag(worker_tag)
+    _set_task_owner(task_id, 123123123)
     _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.PENDING)
     assert client.get_task_retries(task_id) > 0
+
+
+def _set_task_owner(task_id: int, owner_id: int) -> None:
+    with sql.session_scope() as s:
+        record = s.query(TaskRecord).get(task_id)
+        record.owner = owner_id
+        s.merge(record)
 
 
 def _wait_for_true(func, timeout_seconds=10):
@@ -44,6 +51,8 @@ def _wait_for_true(func, timeout_seconds=10):
 
 
 def _sleep(seconds: float) -> None:
+    from time import sleep
+
     sleep(seconds)
 
 

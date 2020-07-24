@@ -1,23 +1,20 @@
 import sys
-from datetime import datetime
-from random import random
+from datetime import datetime, timedelta
 from time import sleep
-from typing import Optional, List
-from uuid import uuid4
+from typing import Optional
 
 import dill
 
 from qless import sql
 from qless.log import log
-from qless.task import TaskStatus, Task
 from qless.records import TaskRecord, WorkerRecord
+from qless.task import TaskStatus, Task
 
 
 def work_loop(
     db_url: str,
-    worker_tag: str,
-    cleanup_every_seconds: int = 1000,
     tick_seconds: float = 1,
+    worker_tag: str = "",
 ) -> None:
     """ Infinite loop that continuously monitors the DB for tasks,
     claims tasks, executes their code, and saves results
@@ -29,12 +26,10 @@ def work_loop(
     log(f"Worker started. Tag: {worker_tag}. Id = {me}")
     while _hearbeat(me):
         sleep(tick_seconds)
-        print(datetime.now())
-        task = claim_task(me)
+        print(f"{datetime.now()} [{worker_tag}]")
+        task = claim_task(me, worker_tag)
         if task is not None:
             run(task)
-        if random() < 1 / (cleanup_every_seconds / tick_seconds):
-            cleanup()
 
 
 def _register_worker(worker_tag: str) -> int:
@@ -52,6 +47,7 @@ def _hearbeat(worker_id: int) -> bool:
 
     :returns: True if all is normal, False if execution should stop
     """
+    cleanup()
     with sql.session_scope() as session:
         record = session.query(WorkerRecord).get(worker_id)
         if record is None:
@@ -65,8 +61,20 @@ def cleanup():
     retry_task_whose_owner_is_dead()
 
 
+def _max_seconds_without_hearbeat():
+    return 5
+
+
 def retry_task_whose_owner_is_dead():
-    pass
+    too_long_ago = datetime.now() - timedelta(seconds=_max_seconds_without_hearbeat())
+    with sql.session_scope() as session:
+        dead_workers = session.query(WorkerRecord).filter(WorkerRecord.last_heartbeat < too_long_ago).all()
+        tasks_ids_to_reset = [w.working_on_task_id for w in dead_workers]
+        if tasks_ids_to_reset:
+            session.query(TaskRecord).filter(TaskRecord.id_.in_(tasks_ids_to_reset)).update({"status": TaskStatus.PENDING.value})
+
+
+
 
 
 def run(task: Task) -> None:
@@ -98,13 +106,13 @@ def save(task_id: int, results: str, status: TaskStatus, owner: int) -> None:
         session.merge(rec)
 
 
-def claim_task(owner: int, worker_tags: List[str]) -> Optional[Task]:
+def claim_task(owner: int, worker_tag: str) -> Optional[Task]:
     no_owner = 0
     with sql.session_scope() as session:
         rec = (
             session.query(TaskRecord)
             .filter_by(status=TaskStatus.PENDING.value, owner=no_owner)
-            .filter(TaskRecord.requires_tag.in_(worker_tags))
+            .filter(TaskRecord.requires_tag.in_([worker_tag, ""]))
             .first()
         )
         if rec is None:
@@ -121,7 +129,7 @@ def claim_task(owner: int, worker_tags: List[str]) -> Optional[Task]:
         id_=id_,
         owner=owner,
         creator=creator,
-        status=new_status,
+        status=TaskStatus.RUNNING.value,
         func=func,
         kwargs=kwargs,
         results="",

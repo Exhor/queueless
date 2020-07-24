@@ -1,10 +1,11 @@
 from datetime import datetime
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict
 
 import dill
+
+from qless.records import TaskRecord
 from qless.sql import session_scope
 from qless.task import TaskStatus
-from qless.records import TaskRecord, WorkerRecord
 
 
 def submit(
@@ -55,12 +56,4 @@ def get_task_result(task_id: int) -> Any:
 
 def get_task_retries(task_id: int) -> int:
     with session_scope() as session:
-        return session.query(TaskRecord.retries).get(task_id)
-
-
-def kill_workers_with_tag(worker_tag: str) -> None:
-    """ Deletes the worker record, workers without records die at their next
-    heartbeat (within a few seconds)
-    """
-    with session_scope() as session:
-        session.query(WorkerRecord).filter_by(tag=worker_tag).delete()
+        return session.query(TaskRecord).get(task_id).retries

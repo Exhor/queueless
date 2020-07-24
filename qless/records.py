@@ -19,6 +19,7 @@ class TaskRecord(BASE):  # type: ignore
     results_dill = Column(Text, nullable=False)
     retries = Column(Integer, nullable=False)
     last_updated = Column(DateTime, nullable=False)
+    requires_tag = Column(Text, nullable=False)
 
 
 class WorkerRecord(BASE):  # type: ignore
@@ -28,4 +29,4 @@ class WorkerRecord(BASE):  # type: ignore
     id_ = Column(Integer, primary_key=True)
     last_heartbeat = Column(DateTime, nullable=False)
     working_on_task_id = Column(Integer, nullable=True)
-    dying_next_heartbeat = Column(Boolean, nullable=False)
+    tag = Column(Text, nullable=False)

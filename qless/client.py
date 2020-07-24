@@ -1,12 +1,23 @@
-from typing import Any, Callable, Dict
+from datetime import datetime
+from typing import Any, Callable, Dict, List
 
 import dill
 from qless.sql import session_scope
 from qless.task import TaskStatus
-from qless.records import TaskRecord
+from qless.records import TaskRecord, WorkerRecord
 
 
-def submit(func: Callable[..., Any], kwargs: Dict[str, Any], creator: int) -> int:
+def submit(
+    func: Callable[..., Any], kwargs: Dict[str, Any], creator: int, requires_tag: str
+) -> int:
+    """ Sends the function to be executed remotely, with the given kwargs
+
+    :param creator: a unique identifier for the creator of this task, to ease later
+        queries such as 'get tasks for this creator'
+
+    :param requires_tag: only workers that have this tag will pick up this
+        task. Defaults to '' (any worker)
+    """
     func_str = str(dill.dumps(func))
     kwargs_str = str(dill.dumps(kwargs))
     status = TaskStatus.PENDING.value
@@ -18,19 +29,21 @@ def submit(func: Callable[..., Any], kwargs: Dict[str, Any], creator: int) -> in
         function_dill=func_str,
         kwargs_dill=kwargs_str,
         results_dill="",
+        retries=0,
+        last_updated=datetime.now(),
+        requires_tag=requires_tag,
     )
     with session_scope() as session:
         session.add(rec)
         session.flush()
         task_id = rec.id_
 
-    # task = Task(id_=task_id, status=TaskStatus.PENDING, owner=owner, func=func_str, kwargs=kwargs_str, results="")
     return task_id
 
 
 def get_task_status(task_id: int) -> TaskStatus:
     with session_scope() as session:
-        return session.query(TaskRecord.status).get(task_id)
+        return session.query(TaskRecord).get(task_id).status
 
 
 def get_task_result(task_id: int) -> Any:
@@ -43,3 +56,11 @@ def get_task_result(task_id: int) -> Any:
 def get_task_retries(task_id: int) -> int:
     with session_scope() as session:
         return session.query(TaskRecord.retries).get(task_id)
+
+
+def kill_workers_with_tag(worker_tag: str) -> None:
+    """ Deletes the worker record, workers without records die at their next
+    heartbeat (within a few seconds)
+    """
+    with session_scope() as session:
+        session.query(WorkerRecord).filter_by(tag=worker_tag).delete()

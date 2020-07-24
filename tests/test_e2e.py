@@ -8,26 +8,31 @@ from qless import client, sql, log
 
 # A Script to test the library functionality end to end
 from qless.task import TaskStatus
+from qless.worker import work_loop
 
 
 def run_test_e2e():
     db_url = _start_local_postgres_docker_db()
     sql.startup(db_url)
     # sql.reset()
-    w = _start_workers(1)
+    worker_tag = "e2e_test_worker"
+    _start_workers(n_workers=1, db_url=db_url, worker_tag=worker_tag)
+    _start_workers(n_workers=1, db_url=db_url, worker_tag="cleaner")
     func = _make_test_function()
-    task_id = client.submit(func, {"param": "abc"}, 123)
+
+    # cleaner should be able to work on tasks normally
+    task_id = client.submit(func, {"param": "abc"}, 123, requires_tag="cleaner")
     sleep(3)
     result = client.get_task_result(task_id)
     assert result == len("abc") + 42
     log.log("Tasks run OK")
 
-    # Tasks are resheduled if a worker dies (TODO)
-    # task_id = client.submit(_sleep, {"seconds": 5}, 123)
-    # _wait_for_true(lambda : client.get_task_status(task_id) == TaskStatus.RUNNING)
-    # w[0].stop()
-    # _wait_for_true(lambda : client.get_task_status(task_id) == TaskStatus.PENDING)
-    # assert client.get_task_retries(task_id) > 0
+    # Tasks are resheduled if a worker dies
+    task_id = client.submit(_sleep, {"seconds": 5}, 123, requires_tag=worker_tag)
+    _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.RUNNING)
+    client.kill_workers_with_tag(worker_tag)
+    _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.PENDING)
+    assert client.get_task_retries(task_id) > 0
 
 
 def _wait_for_true(func, timeout_seconds=10):
@@ -62,16 +67,18 @@ def _make_test_function() -> Callable[[str], int]:
     return closured
 
 
-def _run_worker():
-    import os
+# def _run_worker(db_url: str, worker_tag: str) -> None:
+#     import os
+#
+#     os.system(f"cd qless && python worker {db_url} {worker_tag}")
 
-    os.system("python -m qless.worker")
 
-
-def _start_workers(n_workers: int) -> List[Process]:
+def _start_workers(n_workers: int, db_url: str, worker_tag: str) -> List[Process]:
     processes = []
     for worker in range(n_workers):
-        p = Process(target=_run_worker)
+        p = Process(
+            target=work_loop, kwargs={"db_url": db_url, "worker_tag": worker_tag}
+        )
         p.start()
         processes.append(p)
     return processes

@@ -2,7 +2,7 @@ import sys
 from datetime import datetime
 from random import random
 from time import sleep
-from typing import Optional
+from typing import Optional, List
 from uuid import uuid4
 
 import dill
@@ -10,11 +10,14 @@ import dill
 from qless import sql
 from qless.log import log
 from qless.task import TaskStatus, Task
-from qless.records import TaskRecord
+from qless.records import TaskRecord, WorkerRecord
 
 
 def work_loop(
-    db_url: str, cleanup_every_seconds: int = 1000, tick_seconds: float = 1
+    db_url: str,
+    worker_tag: str,
+    cleanup_every_seconds: int = 1000,
+    tick_seconds: float = 1,
 ) -> None:
     """ Infinite loop that continuously monitors the DB for tasks,
     claims tasks, executes their code, and saves results
@@ -22,9 +25,9 @@ def work_loop(
     It will also periodically do a clean up (reset orphaned tasks, delete old results)
     """
     sql.startup(db_url)
-    me = hash(str(uuid4())) % 1000000000
-    log(f"Worker started. Id = {me}")
-    while True:
+    me = _register_worker(worker_tag)
+    log(f"Worker started. Tag: {worker_tag}. Id = {me}")
+    while _hearbeat(me):
         sleep(tick_seconds)
         print(datetime.now())
         task = claim_task(me)
@@ -32,6 +35,30 @@ def work_loop(
             run(task)
         if random() < 1 / (cleanup_every_seconds / tick_seconds):
             cleanup()
+
+
+def _register_worker(worker_tag: str) -> int:
+    """ Registers the worker with the DB and returns its unique id """
+    with sql.session_scope() as session:
+        record = WorkerRecord(last_heartbeat=datetime.now(), tag=worker_tag)
+        session.add(record)
+        session.flush()
+        return int(record.id_)
+
+
+def _hearbeat(worker_id: int) -> bool:
+    """ Interacts with the Worker table, checking if worker needs to die, and
+    updating the worker heartbeat to signal it is still alive
+
+    :returns: True if all is normal, False if execution should stop
+    """
+    with sql.session_scope() as session:
+        record = session.query(WorkerRecord).get(worker_id)
+        if record is None:
+            return False
+        record.last_heartbeat = datetime.now()  # TODO: only if diff > 3 sec
+        session.merge(record)
+    return True
 
 
 def cleanup():
@@ -71,20 +98,19 @@ def save(task_id: int, results: str, status: TaskStatus, owner: int) -> None:
         session.merge(rec)
 
 
-def claim_task(owner: int) -> Optional[Task]:
+def claim_task(owner: int, worker_tags: List[str]) -> Optional[Task]:
     no_owner = 0
-    search_status = TaskStatus.PENDING.value
-    new_status = TaskStatus.RUNNING.value
     with sql.session_scope() as session:
         rec = (
             session.query(TaskRecord)
-            .filter_by(status=search_status, owner=no_owner)
+            .filter_by(status=TaskStatus.PENDING.value, owner=no_owner)
+            .filter(TaskRecord.requires_tag.in_(worker_tags))
             .first()
         )
         if rec is None:
             return None
         rec.owner = owner
-        rec.status = new_status
+        rec.status = TaskStatus.RUNNING.value
         session.merge(rec)
         func = rec.function_dill
         kwargs = rec.kwargs_dill
@@ -103,10 +129,13 @@ def claim_task(owner: int) -> Optional[Task]:
 
 
 if __name__ == "__main__":
+    args = sys.argv
     db_url = "postgres://postgres:test@localhost:5000/qless"
-    if len(sys.argv) < 2:
+    if len(args) < 2:
         log(f"SQL connection string not specified. Using default: {db_url}")
     else:
-        db_url = sys.argv[1]
+        db_url = args[1]
 
-    work_loop(db_url)
+    worker_tag = args[2] if len(args) > 2 else "worker"
+
+    work_loop(db_url, worker_tag)

@@ -9,31 +9,37 @@ from qless import client, sql, log
 # A Script to test the library functionality end to end
 from qless.records import TaskRecord
 from qless.task import TaskStatus
-from qless.worker import work_loop
+from qless.worker import _run_worker
 
 
-def run_test_e2e():
+def run_test_e2e():  # TODO: multiple workers are picking up the same task (bug)
     db_url = _start_local_postgres_docker_db()
     sql.startup(db_url)
-    # sql.reset()
     worker_tag = "e2e_test_worker"
-    worker = _start_workers(n_workers=1, db_url=db_url, worker_tag=worker_tag)[0]
-    _start_workers(n_workers=1, db_url=db_url, worker_tag="cleaner")
+    _start_workers(n_workers=1, db_url=db_url, worker_tag=worker_tag)
+    _start_workers(n_workers=1, db_url=db_url, worker_tag="cleaner", cleanup_timeout=1)
+    _start_workers(n_workers=1, db_url=db_url, worker_tag="cleaner", cleanup_timeout=1)
+    _start_workers(n_workers=1, db_url=db_url, worker_tag="cleaner", cleanup_timeout=1)
+    _start_workers(n_workers=1, db_url=db_url, worker_tag="cleaner", cleanup_timeout=1)
     func = _make_test_function()
 
     # cleaner should be able to work on tasks normally
     task_id = client.submit(func, {"param": "abc"}, 123, requires_tag="cleaner")
-    sleep(3)
+    _wait_for_true(lambda: client.get_task_result(task_id) is not None)
     result = client.get_task_result(task_id)
     assert result == len("abc") + 42
-    log.log("Tasks run OK")
+    log.log("[OK] Tasks run")
 
-    # Tasks are resheduled if a worker dies
-    task_id = client.submit(_sleep, {"seconds": 5}, 123, requires_tag=worker_tag)
-    _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.RUNNING)
-    _set_task_owner(task_id, 123123123)
-    _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.PENDING)
-    assert client.get_task_retries(task_id) > 0
+    # Tasks are resheduled if their worker is not alive
+    # start a task which takes longer than the expected heartbeat,
+    # resulting in the worker being considered 'dead' and its task
+    # rescheduled, this should happen n_retries times
+    task_id = client.submit(_sleep, {"seconds": 5}, 123, n_retries_if_worker_hangs=2)
+    _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.ERROR)
+    assert client.get_task_status(task_id) == TaskStatus.TIMEOUT
+    log.log("[OK] Orphaned tasks rescheduled")
+
+    log.log("[OK] All OK! :)")
 
 
 def _set_task_owner(task_id: int, owner_id: int) -> None:
@@ -48,7 +54,7 @@ def _wait_for_true(func, timeout_seconds=10):
     while not func():
         sleep(0.1)
         if (datetime.now() - start).total_seconds() > timeout_seconds:
-            return
+            raise TimeoutError(f"Waited for longer than {timeout_seconds} seconds.")
 
 
 def _sleep(seconds: float) -> None:
@@ -61,7 +67,7 @@ def _make_test_function() -> Callable[[str], int]:
     """ Create a test function with a couple of complex elements:
     - a class definition which will be referenced in the function
         closure (ClosuredClass)
-    - an instance of this class, whose state determins the funciton
+    - an instance of this class, whose state determines the funciton
         behaviour (the field x=42)
     """
 
@@ -77,17 +83,24 @@ def _make_test_function() -> Callable[[str], int]:
     return closured
 
 
-# def _run_worker(db_url: str, worker_tag: str) -> None:
-#     import os
-#
-#     os.system(f"cd qless && python worker {db_url} {worker_tag}")
+def _run_worker_via_cli(db_url: str, worker_tag: str) -> None:
+    os.system(f"python -m qless.worker {db_url} {worker_tag}")
 
 
-def _start_workers(n_workers: int, db_url: str, worker_tag: str) -> List[Process]:
+def _start_workers(
+    n_workers: int, db_url: str, worker_tag: str, cleanup_timeout: float = 300
+) -> List[Process]:
     processes = []
     for worker in range(n_workers):
         p = Process(
-            target=work_loop, kwargs={"db_url": db_url, "worker_tag": worker_tag}
+            # target=_run_worker_via_cli, kwargs={"db_url": db_url, "worker_tag": worker_tag}, daemon=True
+            target=_run_worker,
+            kwargs={
+                "postgres_db_url": db_url,
+                "worker_tag": worker_tag,
+                "cleanup_timeout": cleanup_timeout,
+            },
+            daemon=True,
         )
         p.start()
         processes.append(p)

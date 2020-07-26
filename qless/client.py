@@ -5,11 +5,15 @@ import dill
 
 from qless.records import TaskRecord
 from qless.sql import session_scope
-from qless.task import TaskStatus
+from qless.task import TaskStatus, NO_OWNER
 
 
 def submit(
-    func: Callable[..., Any], kwargs: Dict[str, Any], creator: int, requires_tag: str
+    func: Callable[..., Any],
+    kwargs: Dict[str, Any],
+    creator: int,
+    requires_tag: str = "",
+    n_retries_if_worker_hangs: int = 1,
 ) -> int:
     """ Sends the function to be executed remotely, with the given kwargs
 
@@ -25,12 +29,12 @@ def submit(
 
     rec = TaskRecord(
         creator=creator,
-        owner=0,
+        owner=NO_OWNER,
         status=status,
         function_dill=func_str,
         kwargs_dill=kwargs_str,
         results_dill="",
-        retries=0,
+        retries=n_retries_if_worker_hangs,
         last_updated=datetime.now(),
         requires_tag=requires_tag,
     )

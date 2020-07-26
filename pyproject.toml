@@ -10,7 +10,6 @@ python = "^3.6"
 dill = "*"
 sqlalchemy = "*"
 psycopg2 = "^2.8.5"
-pydantic = "*"
 
 [tool.poetry.dev-dependencies]
 

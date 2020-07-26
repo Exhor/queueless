@@ -37,7 +37,6 @@ def _run_worker(
     while _hearbeat(me):
         _cleanup(cleanup_timeout)
         sleep(tick_seconds)
-        print(f"{datetime.now()} [{worker_tag}]")
         task = _claim_task(me, worker_tag)
         if task is not None:
             _run_task(task, me)
@@ -83,13 +82,14 @@ def _search_for_dead_workers_and_disown_their_tasks(cleanup_timeout: float):
     with sql.session_scope() as session:
         dead_workers = (
             session.query(WorkerRecord)
+            .with_for_update()
             .filter(WorkerRecord.last_heartbeat < too_long_ago)
             .all()
         )
         for dead_worker in dead_workers:
             task_id = dead_worker.working_on_task_id
             if task_id is not None:
-                orphan_task = session.query(TaskRecord).get(task_id)
+                orphan_task = session.query(TaskRecord).with_for_update().get(task_id)
                 log(
                     f"Worker {dead_worker.id_} has not responded in {cleanup_timeout} "
                     f"seconds. Its task {task_id} will be disowned, and..."
@@ -98,13 +98,15 @@ def _search_for_dead_workers_and_disown_their_tasks(cleanup_timeout: float):
 
                 retries = orphan_task.retries
                 if retries == 0:
-                    log(f"...Task Status set to TIMOUT. No more retries left")
+                    log(f"...Task Status set to TIMEOUT. No more retries left")
                     orphan_task.status = TaskStatus.TIMEOUT.value
                 else:
                     log(f"...Task status set to PENDING. {retries} retries left")
                     orphan_task.status = TaskStatus.PENDING.value
-                    orphan_task.reties = retries - 1
+                    orphan_task.retries = retries - 1
                 session.merge(orphan_task)
+
+                dead_worker.working_on_task_id = None
 
 
 def _serialise(obj: Any) -> str:
@@ -163,6 +165,7 @@ def _claim_task(worker_id: int, worker_tag: str) -> Optional[Task]:
     with sql.session_scope() as session:
         rec = (
             session.query(TaskRecord)
+            .with_for_update()
             .filter_by(status=TaskStatus.PENDING.value, owner=NO_OWNER)
             .filter(TaskRecord.requires_tag.in_([worker_tag, ""]))
             .first()

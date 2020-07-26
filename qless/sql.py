@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from typing import Generator
 
+from sqlalchemy import MetaData
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm.session import Session, sessionmaker
 
@@ -70,5 +71,6 @@ def _make_qless_db_if_not_present(db):
 
 def _create_all_tables() -> None:
     global _engine
-    BASE.metadata.create_all(_engine)
-    log("Created all tables")
+    if "task" not in MetaData().tables:
+        BASE.metadata.create_all(_engine)
+        log("Created all tables")

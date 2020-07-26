@@ -12,7 +12,7 @@ from qless.task import TaskStatus
 from qless.worker import _run_worker
 
 
-def run_test_e2e():  # TODO: multiple workers are picking up the same task (bug)
+def run_test_e2e():
     db_url = _start_local_postgres_docker_db()
     sql.startup(db_url)
     worker_tag = "e2e_test_worker"
@@ -35,8 +35,7 @@ def run_test_e2e():  # TODO: multiple workers are picking up the same task (bug)
     # resulting in the worker being considered 'dead' and its task
     # rescheduled, this should happen n_retries times
     task_id = client.submit(_sleep, {"seconds": 5}, 123, n_retries_if_worker_hangs=2)
-    _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.ERROR)
-    assert client.get_task_status(task_id) == TaskStatus.TIMEOUT
+    _wait_for_true(lambda: client.get_task_status(task_id) == TaskStatus.TIMEOUT.value)
     log.log("[OK] Orphaned tasks rescheduled")
 
     log.log("[OK] All OK! :)")

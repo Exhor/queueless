@@ -4,12 +4,12 @@ from multiprocessing import Process
 from time import sleep
 from typing import Callable, List
 
-from qless import client, sql, log
+from queueless import client, sql, log
 
 # A Script to test the library functionality end to end
-from qless.records import TaskRecord
-from qless.task import TaskStatus
-from qless.worker import _run_worker
+from queueless.records import TaskRecord
+from queueless.task import TaskStatus
+from queueless.worker import _run_worker
 
 
 def run_test_e2e():

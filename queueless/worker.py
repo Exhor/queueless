@@ -5,10 +5,10 @@ from typing import Optional, Any
 
 import dill
 
-from qless import sql
-from qless.log import log
-from qless.records import TaskRecord, WorkerRecord
-from qless.task import TaskStatus, Task, NO_OWNER
+from queueless import sql
+from queueless.log import log
+from queueless.records import TaskRecord, WorkerRecord
+from queueless.task import TaskStatus, Task, NO_OWNER
 
 
 def _run_worker(
@@ -198,13 +198,13 @@ def _claim_task(worker_id: int, worker_tag: str) -> Optional[Task]:
 def _help() -> str:
     return """
 Usage: 
-    $ python -m qless.worker POSTGRES_DB_URL [TAG] 
+    $ python -m queueless.worker POSTGRES_DB_URL [TAG] 
 
     POSTGRES_DB_URL: full postgres connection string
     TAG: arbitrary string which enables this worker to execute tasks with the same tag
     
 Example:
-    $ python -m qless.worker postgres://postgres:test@localhost:5000/qless my_tag_1
+    $ python -m queueless.worker postgres://postgres:test@localhost:5000/qless my_tag_1
 """
 
 

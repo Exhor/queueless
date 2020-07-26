@@ -3,9 +3,9 @@ from typing import Any, Callable, Dict
 
 import dill
 
-from qless.records import TaskRecord
-from qless.sql import session_scope
-from qless.task import TaskStatus, NO_OWNER
+from queueless.records import TaskRecord
+from queueless.sql import session_scope
+from queueless.task import TaskStatus, NO_OWNER
 
 
 def submit(

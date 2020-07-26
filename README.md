@@ -1,51 +1,50 @@
 # queueless
-Python task distribution using a DB instead of queues
+Python distributed task execution using a DB instead of queues.
 
 # Install 
-Coming soon...
-
-# Usage
-## Requirements
-You must have a postgres db running and accessible from a docker container
-
-## Starting a worker
-
-### Using docker (recommended)
-Once you have the postgres string, pass it as a param to the worker, e.g.
-
-`
-$ docker run -it --network host --entrypoint python qless qless/worker.py postgres://postgres:test@localhost:5000/qless
-`
-
-### From python
-You can also start a worker with just
-
-```python
-from qless import worker
-worker.work_loop("postgres://<your postgres string>")  # blocking, infinite loop
+```
+$ pip install queueless
 ```
 
+# Quickstart
+queueless uses postgres to communicate. You must have a postgres db running, e.g.
+````bash
+docker run --rm --name pg-test -e POSTGRES_PASSWORD=test -it -p 5000:5432 postgres:11
+````
 
-)
-## Using the client
+On another terminal, start a worker, pointing it to the database:
+```bash
+$ python -m queueless.worker postgres://postgres:test@localhost:5000/qless
+```
+Now in your script
 ```python
-from qless import client
-from time import sleep
+from queueless import client
+import time
 
-# make a function
-def my_func(x):
+def function(x: int) -> float:
     return x + 1
 
-# Submit a task
-task_id = client.submit(my_func, {"x": 1}, 123)
+# send the task
+task_id = client.sumbit(func=function, kwargs={"x": 42}, owner=123)
 
 # wait a bit
-sleep(2) 
+time.sleep(2)
 
 # get the result
-print(client.get_task_result(task_id))  # = 2
+assert client.get_task_result(task_id) == 42 + 1
 ```
+## Scaling up
+Simply run more workers on new terminals.
 
+## Using docker 
+You can also run the worker with docker
+### Build
+```bash
+$ python build.py
+
+$ docker run -it --network host --entrypoint python qless qless/worker.py postgres://postgres:test@localhost:5000/qless
+```
+---
 # Development setup
 ## test (requires docker)
 python tests/test_e2e.py

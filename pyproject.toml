@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Database-based task management for python"
 authors = ["Exhor"]
 license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/Exhor/queueless"
+repository = "https://github.com/Exhor/queueless"
 
 [tool.poetry.dependencies]
 python = "^3.6"

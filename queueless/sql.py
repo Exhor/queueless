@@ -12,7 +12,7 @@ _engine = None
 _session_maker = None
 
 
-def startup(db) -> None:
+def startup(db_url: str) -> None:
     """ Call once to start the DB engine, and populate all tables
 
     Creates a global sql Engine. as is typical in SQLAlchemy
@@ -20,9 +20,9 @@ def startup(db) -> None:
     """
     global _engine, _session_maker
     if _engine is None:
-        _engine = create_engine(db)
+        _engine = create_engine(db_url)
         _session_maker = sessionmaker(bind=_engine)
-        _make_qless_db_if_not_present(db)
+        _make_qless_db_if_not_present(db_url)
         _create_all_tables()
 
 
@@ -44,6 +44,8 @@ def session_scope() -> Generator[Session, None, None]:
 
 
     """
+    if _session_maker is None:
+        raise RuntimeError(f"Database was not started. Run client.startup()")
     session = _session_maker()
     try:
         yield session

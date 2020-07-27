@@ -1,6 +1,0 @@
-{
-    "python.formatting.provider": "black",
-    "files.autoSave": "onFocusChange",
-    "python.analysis.typeCheckingMode": "basic",
-    "python.pythonPath": "${workspaceFolder}/.venv",
-}

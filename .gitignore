@@ -1,5 +1,7 @@
 # compiled
-__pycache__/
+queueless/__pycache__
+**/__pycache__
+*.pyc
 
 # Distribution / packaging
 bin/
